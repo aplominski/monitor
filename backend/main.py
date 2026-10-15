@@ -1,5 +1,7 @@
+import http.client as httpclient
 import json
 import os
+import socket
 import threading
 import time
 
@@ -159,6 +161,71 @@ def stats():
     return {"cpu_pct": cpu_pct(), "mem": mem(), "disk": disk(), "net": net(), "temps": temps(),
             "load": [round(x, 2) for x in os.getloadavg()], "uptime_s": int(up)}
 
+def check_port(host, port, use_http=False, timeout=2.0):
+    t0 = time.time()
+    try:
+        s = socket.create_connection((host, port), timeout=timeout)
+        s.close()
+        ms = round((time.time() - t0) * 1000, 1)
+        code = None
+        if use_http:
+            try:
+                c = httpclient.HTTPConnection(host, port, timeout=timeout)
+                c.request("GET", "/")
+                code = c.getresponse().status
+                c.close()
+            except OSError:
+                pass
+        return {"open": True, "ms": ms, "code": code}
+    except OSError:
+        return {"open": False, "ms": None, "code": None}
+
+PORTS_FILE = os.path.join(BASE, "ports.jsonl")
+
+def load_ports():
+    out = []
+    try:
+        with open(PORTS_FILE) as f:
+            for ln in f:
+                try:
+                    out.append(json.loads(ln))
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    if not out:
+        out = [
+            {"name": "SSH", "host": "127.0.0.1", "port": 22},
+            {"name": "HTTP", "host": "127.0.0.1", "port": 80, "http": True},
+            {"name": "APP", "host": "127.0.0.1", "port": 8080, "http": True},
+        ]
+    return out
+
+def save_ports(ports):
+    with open(PORTS_FILE, "w") as f:
+        for p in ports:
+            f.write(json.dumps(p) + "\n")
+
+@app.get("/api/ports")
+def ports():
+    return [{**p, **check_port(p["host"], p["port"], p.get("http", False))} for p in load_ports()]
+
+@app.post("/api/ports")
+def add_port(p: dict):
+    ports = load_ports()
+    ports.append({"name": str(p.get("name", "SVC"))[:24], "host": str(p.get("host", "127.0.0.1"))[:64],
+                  "port": max(1, min(65535, int(p.get("port", 80)))), "http": bool(p.get("http", False))})
+    save_ports(ports)
+    return ports
+
+@app.delete("/api/ports/{idx}")
+def del_port(idx: int):
+    ports = load_ports()
+    if 0 <= idx < len(ports):
+        ports.pop(idx)
+        save_ports(ports)
+    return ports
+
 @app.get("/api/processes")
 def processes():
     return procs()
@@ -166,7 +233,8 @@ def processes():
 if os.path.isdir(STATIC):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC, "assets")), name="assets")
 
-    @app.get("/{path:path}")
+    @app.get("/{path:path}", include_in_schema=False)
+    @app.head("/{path:path}", include_in_schema=False)
     def spa(path: str):
         fp = os.path.join(STATIC, path)
         if path and os.path.isfile(fp):

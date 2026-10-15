@@ -4,6 +4,7 @@ type Stats = { cpu_pct: number; mem: any; disk: any; net: any; temps: { name: st
 type Proc = { pid: number; name: string; mem_mb: number };
 type Pt = { ts: number; cpu: number; mem: number; disk: number; temp: number };
 type Key = "cpu" | "mem" | "disk" | "temp";
+type Port = { name: string; host: string; port: number; http?: boolean; open: boolean; ms: number | null; code: number | null };
 const META: Record<Key, { t: string; unit: string; max: number }> = {
   cpu: { t: "CPU", unit: "%", max: 100 }, mem: { t: "RAM", unit: "%", max: 100 },
   disk: { t: "DISK", unit: "%", max: 100 }, temp: { t: "TEMP", unit: "C", max: 100 },
@@ -21,16 +22,19 @@ function Spark(props: { data: number[]; max?: number; big?: boolean }) {
 }
 const fmtUp = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
 const fmtT = (ts: number) => new Date(ts * 1000).toLocaleString("en-GB", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+const url = (p: Port) => `${p.port === 443 ? "https" : "http"}://${p.host === "127.0.0.1" ? location.hostname : p.host}:${p.port}`;
 
 export default function App() {
   const [st, setSt] = createSignal<Stats | null>(null);
   const [ps, setPs] = createSignal<Proc[]>([]);
   const [hi, setHi] = createSignal<Pt[]>([]);
   const [sel, setSel] = createSignal<Key | null>(null);
+  const [ports, setPorts] = createSignal<Port[]>([]);
   const tick = async () => {
     try {
       setSt(await (await fetch("/api/stats")).json());
       setPs(await (await fetch("/api/processes")).json());
+      setPorts(await (await fetch("/api/ports")).json());
     } catch {}
   };
   const hist = async () => {
@@ -50,7 +54,7 @@ export default function App() {
   };
   return (
     <main>
-      <header><b>monitor</b><span>:8080 · log 15m · {hi().length} pkt/24h</span></header>
+      <header><b>monitor</b><span>:8080 · log 15m · {hi().length} pts/24h</span></header>
       <Show when={st()} fallback={<p class="loading">connecting…</p>}>
         <div class="grid">
           {(["cpu", "mem", "disk", "temp"] as Key[]).map(k => (
@@ -73,6 +77,38 @@ export default function App() {
           <table><tbody>
             <For each={ps()}>{p => <tr><td>{p.pid}</td><td>{p.name}</td><td>{p.mem_mb} MB</td></tr>}</For>
           </tbody></table>
+        </section>
+        <section class="card">
+          <h2>PORTS</h2>
+          <table><tbody>
+            <For each={ports()}>{(p, i) => (
+              <tr>
+                <td><i class={p.open ? "dot on" : "dot off"} /></td>
+                <td>{p.name}</td>
+                <td>{p.open && p.http ? <a href={url(p)} target="_blank" rel="noreferrer">{p.host}:{p.port}</a> : <span>{p.host}:{p.port}</span>}</td>
+                <td>{p.open ? `${p.ms} ms${p.code ? ` · ${p.code}` : ""}` : "closed"}</td>
+                <td><button class="mini" onClick={async () => {
+                  const r = await fetch(`/api/ports/${i()}`, { method: "DELETE" });
+                  setPorts(await r.json());
+                }}>x</button></td>
+              </tr>
+            )}</For>
+          </tbody></table>
+          <form class="prow" onSubmit={async e => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            const r = await fetch("/api/ports", { method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: f.get("name"), host: f.get("host"), port: f.get("port"), http: f.get("http") === "on" }) });
+            setPorts(await r.json());
+            e.currentTarget.reset();
+          }}>
+            <input name="name" placeholder="name" maxlength={24} required />
+            <input name="host" placeholder="host" value="127.0.0.1" required />
+            <input name="port" placeholder="port" type="number" min={1} max={65535} required />
+            <label><input name="http" type="checkbox" /> http</label>
+            <button type="submit">add</button>
+          </form>
         </section>
       </Show>
       <Show when={sel()}>

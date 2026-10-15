@@ -6,7 +6,8 @@ header { display: flex; justify-content: space-between; padding: 10px 2px 18px; 
 header b { color: var(--acc); font-size: 17px; letter-spacing: 1px; }
 header span, small { color: var(--dim); }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 10px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+.grid .card { margin-bottom: 0; }
 .card h2 { font-size: 12px; letter-spacing: 1px; color: var(--dim); margin-bottom: 8px; }
 .bar { height: 10px; background: #0a0d12; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin-bottom: 6px; }
 .bar i { display: block; height: 100%; background: linear-gradient(90deg, #238636, var(--acc)); transition: width .5s; }
@@ -29,3 +30,16 @@ td:last-child { text-align: right; }
 .big polyline { fill: none; stroke: var(--acc); stroke-width: 1; }
 .stats { display: flex; gap: 16px; margin: 10px 0; font-size: 13px; color: var(--dim); }
 .stats b { color: var(--tx); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.dot.on { background: var(--acc); box-shadow: 0 0 6px var(--acc); }
+.dot.off { background: #f85149; }
+.prow { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.prow input { background: #0a0d12; border: 1px solid var(--line); color: var(--tx); border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12px; }
+.prow input[name="name"] { width: 80px; }
+.prow input[name="host"] { width: 110px; }
+.prow input[name="port"] { width: 70px; }
+.prow label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--dim); }
+.prow button, .mini { background: none; border: 1px solid var(--line); color: var(--tx); border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+.prow button:hover, .mini:hover { border-color: var(--acc); }
+td a { color: var(--acc); text-decoration: none; }
+td a:hover { text-decoration: underline; }
